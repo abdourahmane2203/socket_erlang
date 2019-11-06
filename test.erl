@@ -46,6 +46,7 @@ get_nick(Server,Sock) ->
       get_nick(Server,Sock);
     usable ->
       io:format("\r\n Un nouveau utilisateur s'est connecté "),
+      gen_tcp:send(Sock, "Bienvenu vous vous êtes connecté !\r\n"),
       Nick
   end.
 
