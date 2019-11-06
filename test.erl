@@ -10,9 +10,16 @@ client_listener(Client,Sock) ->
       Other
   end.
 
+%%-- Nick variable qui va contenir l'identifiant du client%%%%
+%%% Cette variable Nick doit être unique, ==> voir la fonction get_Nick() pour plus de détails
 client_loop(Server,Nick,Sock) ->
   receive
     {sendmsg,Msg} ->
+
+      %%--- Msg contiendra text que client va saisir sur le terminal
+      %%--- Et à chaque fois on affiche le message comme suit : abdou:Bonjour
+      %%--- ou abdou est le Nick et bonjour est le Msg
+
       Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r" ++ Nick ++ ":" ++ Msg};
     {recvmsg,Msg} ->
       ok = gen_tcp:send(Sock,"\r" ++ Msg)
@@ -21,12 +28,15 @@ client_loop(Server,Nick,Sock) ->
   client_loop(Server,Nick,Sock).
 
 get_nick(Server,Sock) ->
+  %% On envoie ce que client a saisi
   {ok,Pack} = gen_tcp:recv(Sock,7),
-  
+
+  %% On Verifie si Nick est déjà utilisé par un autre client si oui
+  %% On envoie le message "Deja utilise:" et redemande au client de saisir un autre Nick
   Server ! {check_nick,self(),Pack},
   receive
     collision ->
-      ok = gen_tcp:send(Sock,"Deja utilise:"),
+      ok = gen_tcp:send(Sock,"Déjà utilisé:"),
 
       get_nick(Server,Sock);
     usable ->
@@ -70,15 +80,17 @@ loop(LSock,Clients,Nicks) ->
           From ! usable
       end,
       loop(LSock,Clients,Nicks);
+    %% ---- broadcast contiendra la liste de  tous les clients sauf l'expéditeur
     {broadcast,From,Msg} ->
       BroadList = lists:filter(fun(Client) ->
         Client =/= From
-                               end,
-        Clients),
+        end,
+        Clients), %% -- Permet de filtrer tous les clients sauf l'expéediteur (From)
       lists:map(fun(Client) ->
         Client ! {recvmsg,Msg}
-                end,
+        end,
         BroadList),
+      %% On tente d'envoyer chaque client en le localisant par son ID==Nick
       loop(LSock,Clients,Nicks)
   end.
 
