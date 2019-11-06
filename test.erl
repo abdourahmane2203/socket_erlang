@@ -10,37 +10,38 @@ client_listener(Client,Sock) ->
       Other
   end.
 
-%%-- Nick variable qui va contenir l'identifiant du client%%%%
+%%-- Nick variable qui va contenir l'identifiant du client---%%%%
 %%% Cette variable Nick doit être unique, ==> voir la fonction get_Nick() pour plus de détails
 client_loop(Server,Nick,Sock) ->
   receive
     {sendmsg,Msg} ->
 
-      %%--- Msg contiendra text que client va saisir sur le terminal
-      %%--- Et à chaque fois on affiche le message comme suit : abdou:Bonjour
+      %%--- Msg contiendra text que le client va saisir sur le terminal
+      %%--- Et à chaque fois on affiche le message comme suit abdou:Bonjour
       %%--- ou abdou est le Nick et bonjour est le Msg
 
       Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r" ++ Nick ++ ":" ++ Msg};
     {recvmsg,Msg} ->
       ok = gen_tcp:send(Sock,"\r" ++ Msg)
   end,
-  ok = gen_tcp:send(Sock,Nick ++ ":"),
+  ok = gen_tcp:send(Sock,Nick ++ ":"), %%% --- Exple ==>  abdou: 
   client_loop(Server,Nick,Sock).
 
 get_nick(Server,Sock) ->
-  %% On envoie ce que client a saisi
+  %% Le serveur reçoit ce que le client a saisi ==> 7 caractères
   {ok,Pack} = gen_tcp:recv(Sock,7),
 
-  %% On Verifie si Nick est déjà utilisé par un autre client si oui
-  %% On envoie le message "Deja utilise:" et redemande au client de saisir un autre Nick
+  %% On Verifie si Nick est déjà utilisé par un autre client 
   Server ! {check_nick,self(),Pack},
   receive
+    %% si oui
+    %% On envoie le message "Deja utilise:" et redemande au client de saisir un autre Nick
     collision ->
       ok = gen_tcp:send(Sock,"Déjà utilisé:"),
 
       get_nick(Server,Sock);
     usable ->
-      io:format(Pack),
+      io:format(Pack), %% Ceci sera affciher dans le terminal du serveur
       Pack
   end.
 
