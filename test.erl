@@ -23,15 +23,15 @@ client_loop(Server,Nick,Sock) ->
       %%Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r:" ++ Msg};
       %%{recvmsg,Msg} ->
       if (Msg == "quit123")
-         ->gen_tcp:close() ;
+         ->gen_tcp:close(Sock) ;
         true ->
           ok = gen_tcp:send(Sock,"\r" ++ Msg ++ "\r\n"),
           io:format("Message envoye par : " ++Nick++"\r\n"),
-          client_loop(Server,Nick,Sock)
+          client_loop(Server,Nick,Sock),
+          ok = gen_tcp:send(Sock, Nick++"\r:")
       end
 
   end,
-  ok = gen_tcp:send(Sock, Nick++"\r:"),
   client_loop(Server,Nick,Sock).
 
 get_nick(Server,Sock) ->
