@@ -2,7 +2,7 @@
 -export([run/1,worker/2,client_listener/2]).
 
 client_listener(Client,Sock) ->
-  case gen_tcp:recv(Sock,0) of
+  case gen_tcp:recv(Sock,7) of
     {ok,Pack} ->
       Client ! {sendmsg,Pack},
       client_listener(Client,Sock);
@@ -10,39 +10,43 @@ client_listener(Client,Sock) ->
       Other
   end.
 
-%%-- Nick variable qui va contenir l'identifiant du client---%%%%
+%%-- Nick variable qui va contenir l'identifiant du client%%%%
 %%% Cette variable Nick doit être unique, ==> voir la fonction get_Nick() pour plus de détails
 client_loop(Server,Nick,Sock) ->
   receive
     {sendmsg,Msg} ->
 
-      %%--- Msg contiendra text que le client va saisir sur le terminal
-      %%--- Et à chaque fois on affiche le message comme suit abdou:Bonjour
+      %%--- Msg contiendra text que client va saisir sur le terminal
+      %%--- Et à chaque fois on affiche le message comme suit : abdou:Bonjour
       %%--- ou abdou est le Nick et bonjour est le Msg
 
-      Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r" ++ Nick ++ ":" ++ Msg};
-    {recvmsg,Msg} ->
-      ok = gen_tcp:send(Sock,"\r" ++ Msg)
+      %%Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r:" ++ Msg};
+      %%{recvmsg,Msg} ->
+      ok = gen_tcp:send(Sock,"\r" ++ Msg ++ "\r\n"),
+      client_loop(Server,Nick,Sock)
   end,
-  ok = gen_tcp:send(Sock,Nick ++ ":"), %%% --- Exple ==>  abdou: 
+  ok = gen_tcp:send(Sock, Nick++"\r:"),
   client_loop(Server,Nick,Sock).
 
 get_nick(Server,Sock) ->
-  %% Le serveur reçoit ce que le client a saisi ==> 7 caractères
   {ok,Pack} = gen_tcp:recv(Sock,7),
-
-  %% On Verifie si Nick est déjà utilisé par un autre client 
+  {Trimed,_} = lists:splitwith(fun(X) -> X =/= $\r end,Pack),
+  Nick = if
+         length(Trimed) > 7 ->
+         {Ret,_} = lists:split(7,Trimed),
+       Ret;
+   true ->
+   Trimed
+  end,
   Server ! {check_nick,self(),Pack},
   receive
-    %% si oui
-    %% On envoie le message "Deja utilise:" et redemande au client de saisir un autre Nick
     collision ->
-      ok = gen_tcp:send(Sock,"Déjà utilisé:"),
+      ok = gen_tcp:send(Sock,"Cet Identifiant est utilisé par un autre:"),
 
       get_nick(Server,Sock);
     usable ->
-      io:format(Pack), %% Ceci sera affciher dans le terminal du serveur
-      Pack
+      io:format("\r\n Un nouveau utilisateur s'est connecté "),
+      Nick
   end.
 
 client_init(Server,Sock) ->
@@ -67,6 +71,8 @@ worker(Server,LSock) ->
   end.
 
 loop(LSock,Clients,Nicks) ->
+  %% Affiche dans le terminal du serveur
+  io:format("\n Le serveur est lancé"),
   receive
     {ready,From,Nick} ->
       loop(LSock,[From|Clients],sets:add_element(Nick,Nicks));
