@@ -22,8 +22,14 @@ client_loop(Server,Nick,Sock) ->
 
       %%Server ! {broadcast,self(),lists:duplicate(13,$\s) ++ "\r:" ++ Msg};
       %%{recvmsg,Msg} ->
-      ok = gen_tcp:send(Sock,"\r" ++ Msg ++ "\r\n"),
-      client_loop(Server,Nick,Sock)
+      if (Msg == "quit123")
+         ->gen_tcp:close() ;
+        true ->
+          ok = gen_tcp:send(Sock,"\r" ++ Msg ++ "\r\n"),
+          io:format("Message envoye par : " ++Nick++"\r\n"),
+          client_loop(Server,Nick,Sock)
+      end
+
   end,
   ok = gen_tcp:send(Sock, Nick++"\r:"),
   client_loop(Server,Nick,Sock).
@@ -51,15 +57,22 @@ get_nick(Server,Sock) ->
   end.
 
 client_init(Server,Sock) ->
+  AllClientsF = [],
   ok = gen_tcp:send(Sock,"Bienvenu dans minimal chat avec erlang\r\n"),
   ok = gen_tcp:send(Sock,"Entrer un identifiant:\r\n"),
   Nick = get_nick(Server,Sock),
 
-  ok = gen_tcp:send(Sock,Nick ++":\r\n"),
+  ok = gen_tcp:send(Sock,Nick ++": \r\n"),
 
   Server ! {ready,self(),Nick},
 
   spawn(?MODULE,client_listener,[self(),Sock]),
+  %%io:format("Client ready :\r\n"++Nick),
+  %% On recupere les Nick de tous les clients et on le stock dans une liste.
+  AllClients = [Nick],
+  AllClientsF ++ AllClients,
+  io:format("All Clients ready :\r\n" ++Nick),
+  %%gen_tcp:send(Sock, "Message envoyé !"),
   client_loop(Server,Nick,Sock).
 
 worker(Server,LSock) ->
@@ -76,7 +89,8 @@ loop(LSock,Clients,Nicks) ->
   io:format("\n Le serveur est lancé"),
   receive
     {ready,From,Nick} ->
-      loop(LSock,[From|Clients],sets:add_element(Nick,Nicks));
+      loop(LSock,[From|Clients],sets:add_element(Nick,Nicks)),
+      io:format("\n From :"++From);
     new_worker ->
       spawn(?MODULE,worker,[self(),LSock]),
       loop(LSock,Clients,Nicks);
